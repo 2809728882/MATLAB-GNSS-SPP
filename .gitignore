@@ -1,0 +1,5 @@
+outputs/
+artifacts/
+*.asv
+*.m~
+slprj/

@@ -1,65 +1,44 @@
-function [pos, vel, satIDs] = readSP3(fp)
-
-%% 1 fgetl 读取每行 找到所有*的行
-%% 2 找到所有P字母的行
-if nargin < 1
-    fp = 'E:\SPP0528xs\SPP0523xs\data\SP3\igs20464.sp3';
+function [pos,vel,satIDs,times,clocks]=readSP3(path)
+%READSP3 Read SP3 positions in metres, clocks in seconds, true epoch times.
+% Missing positions/clocks become NaN. Velocities use only the SAME satellite.
+if nargin<1
+    root=fileparts(fileparts(mfilename('fullpath')));
+    path=fullfile(root,'data','SP3','igs20464.sp3');
 end
-fpID = fopen(fp);
-if fpID == -1
-    msg = [fp ' 此文件读取失败，请检查文件名是否正确，或者检查路径是否正确。'];
-    msgbox(msg)
-    pos = [];
-    vel = [];
-    satIDs = [];
-    return;
-end
-
-i = 1; m = 1; k = 1;
-xyz = zeros(24*60*60/15,3);
-dt = zeros(24*60*60/15,6);
-IP = zeros(24*60*60/15,1);
-IT = zeros(24*60*60/15,1);
-satIDs = cell(24*60*60/15,1);
-
-while 1
-    line = fgetl(fpID);
-    % 1 设置退出条件
-    if  line == -1
-        break;
-    end
-    if startsWith(line,'P')
-        % 解析卫星位置数据
-        parts = textscan(line(2:end), '%s %f %f %f %f %f %f %f %f %f %f %f %f %f');
-        satIDs{m} = parts{1}{1};
-        xyz(m,:) = [parts{2:4}];
-        IP(m) = i;
-        m = m+1;
-    end
+fid=fopen(path,'rt'); if fid<0, error('SPP:FileOpen','Cannot open %s',path); end
+guard=onCleanup(@() fclose(fid)); pos=zeros(0,3); satIDs=cell(0,1); serial=[]; clocks=[]; epoch=NaN;
+while true
+    line=fgetl(fid); if ~ischar(line), break; end
     if startsWith(line,'*')
-        % 解析时间数据
-        parts = textscan(line(2:end), '%f %f %f %f %f %f');
-        dt(k,:) = cell2mat(parts);
-        IT(k) = i;
-        k = k+1;
+        stamp=sscanf(line(2:end),'%f',6);
+        if numel(stamp)~=6, error('SPP:SP3','Invalid SP3 epoch'); end
+        epoch=datenum(stamp');
+    elseif startsWith(line,'P')
+        line=[line repmat(' ',1,max(0,60-length(line)))];
+        if ~isfinite(epoch), error('SPP:SP3','Position record before epoch'); end
+        xyz=NaN(1,3);
+        for k=1:3, xyz(k)=str2double(line(5+14*(k-1):18+14*(k-1)))*1000; end
+        if all(xyz==0) || any(abs(xyz)>=999999*1000), xyz(:)=NaN; end
+        clk=str2double(line(47:60)); if abs(clk)>=999999, clk=NaN; end
+        pos(end+1,:)=xyz; satIDs{end+1,1}=strtrim(line(2:4)); %#ok<AGROW>
+        serial(end+1,1)=epoch; clocks(end+1,1)=clk*1e-6; %#ok<AGROW>
+    elseif startsWith(line,'%c') && length(line)>=12
+        ts=strtrim(line(10:12));
+        if ~isempty(ts) && ~ismember(ts,{'GPS','ccc','cc'})
+            error('SPP:TimeSystem','SP3 time system %s requires explicit conversion to GPS',ts);
+        end
     end
-    i = i+1;
 end
-
-fclose(fpID);
-
-% 计算速度（使用中心差分）
-vel = zeros(size(xyz));
-for i = 2:size(xyz,1)-1
-    vel(i,:) = (xyz(i+1,:) - xyz(i-1,:)) / (2 * 15); % 假设时间间隔为15秒
+if isempty(serial), error('SPP:SP3','No SP3 position records'); end
+times=datetime(serial,'ConvertFrom','datenum'); vel=NaN(size(pos));
+ids=unique(satIDs);
+for k=1:numel(ids)
+    ix=find(strcmp(satIDs,ids{k}) & all(isfinite(pos),2));
+    [~,order]=sort(serial(ix)); ix=ix(order);
+    for j=1:numel(ix)
+        if numel(ix)<2, break; end
+        a=max(1,j-1); b=min(numel(ix),j+1); elapsed=(serial(ix(b))-serial(ix(a)))*86400;
+        if elapsed>0, vel(ix(j),:)=(pos(ix(b),:)-pos(ix(a),:))/elapsed; end
+    end
 end
-
-% 整理输出
-pos = xyz(1:m-1,:);
-vel = vel(1:m-1,:);
-satIDs = satIDs(1:m-1);
-
 end
-
-%% 利用readmatrix readtable readcell 读取指定行的数据
-

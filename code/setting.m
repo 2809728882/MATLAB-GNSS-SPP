@@ -1,21 +1,12 @@
-function set = setting
-
-
-%% 文件
-% set.filePath = [pwd '\data\obs'];
-set.filePath = [pwd '\data\obs'];
-
-set.filePath_N = [pwd '\data\nav'];
-
-set.filePath_SP3 = [pwd '\data\SP3'];
-
-
-
-%% 时间
-
-
-
-%% 卫星有关
-
-
-%% 与测站有关
+function config=setting()
+%SETTING Repository-relative, offline default configuration.
+root=fileparts(fileparts(mfilename('fullpath')));
+config=struct('obsFile',fullfile(root,'data','obs','cpt0870.19o'), ...
+    'navFile',fullfile(root,'data','nav','brdm0870.19p'), ...
+    'sp3File',fullfile(root,'data','SP3','igs20464.sp3'), ...
+    'ephemerisMode','broadcast','maxEpochs',120,'elevationMaskDeg',10, ...
+    'maxEphemerisAgeSeconds',7200,'outputDir',fullfile(root,'outputs'), ...
+    'makePlots',true,'troposphereCorrection',true);
+config.filePath=fileparts(config.obsFile); config.filePath_N=fileparts(config.navFile);
+config.filePath_SP3=fileparts(config.sp3File);
+end

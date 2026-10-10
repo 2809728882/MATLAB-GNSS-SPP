@@ -1,17 +1,6 @@
-function sp3 = readSP3head(fp)
-    fid = fopen(fp);
-    if fid == -1
-        error(['无法打开文件 ' fp]);
-    end
-    sp3 = struct();
-    line = fgetl(fid);
-    while ~strncmp(line, 'EOF', 3)
-        if strncmp(line, '*', 1)
-            % 读取头部时间信息
-            temp = textscan(line(2:end), '%f %f %f %f %f %f');
-            sp3.dt = datetime(cell2mat(temp));
-        end
-        line = fgetl(fid);
-    end
-    fclose(fid);
+function h=readSP3head(path)
+%READSP3HEAD Derive coverage metadata from actual SP3 epochs.
+[~,~,ids,times]=readSP3(path);
+h=struct('startTime',min(times),'endTime',max(times),'satellites',{unique(ids)});
+epochs=unique(times); if numel(epochs)>1, h.intervalSeconds=median(seconds(diff(epochs))); else, h.intervalSeconds=NaN; end
 end

@@ -1,139 +1,49 @@
-function headinfo = readOBShead(filepathName)
-% 本函数读取观测值数据的头文件部分内容
-
-% filepath = 'C:\Users\Administrator\Desktop\SPP\data\obs';
-% filename = 'cpt0870.19o';
-% filepathName = [filepath '\' filename];
-
-fpID = fopen(filepathName);
-if fpID == -1
-    msg = [filename ' 此文件读取失败，请检查文件名是否正确，或者检查路径是否正确。'];
-    msgbox(msg)
-end
-%%
-% 初始化需要存储的数据
-ver = NaN;
-stationAPPR = [NaN,NaN,NaN];
-firstObsTime = [NaN,NaN,NaN,NaN,NaN,NaN];
-lastObsTime = [NaN,NaN,NaN,NaN,NaN,NaN];
-num_lines = 1;
-num_G = NaN;
-num_R = NaN;
-num_E = NaN;
-num_C = NaN;
-type_G = {NaN};
-type_R = {NaN};
-type_E = {NaN};
-type_C = {NaN};
-
-
-while 1
-    line = fgetl(fpID);
-    % 1 读取rinex 版本
-    if contains(line,'RINEX VERSION')
-        ver = floor(str2double(line(1:12)));
-
-    end
-
-    % 2 读取测站初始坐标
-    if contains(line,'APPROX POSITION')
-        stationAPPR = sscanf(strtrim(line(1:50)),'%f');
-    end
-
-    % 3 读取第一个观测值的时间
-    if contains(line,'TIME OF FIRST OBS')
-        firstObsTime = sscanf(strtrim(line(1:40)),'%f')';
-    end
-
-    % 4 读取最后一个观测值时间
-    if contains(line,'TIME OF LAST OBS')
-        lastObsTime = sscanf(strtrim(line(1:40)),'%f')';
-    end
-
-
-    % 6 读取观测值的个数以及Type
-    if contains(line,'SYS / # / OBS TYPES')
-
-        switch line(1)
-            case 'G'
-                num_G  = str2double(line(4:6));
-                type_G = regexp(strtrim(line(7:59)), '\S+', 'match');
-                while numel(type_G)<num_G
-                    line = fgetl(fpID);
-                    type_temp = regexp(strtrim(line(7:59)), '\S+', 'match');
-                    type_G = [type_G,type_temp];
-                end
-
-            case 'R'
-                num_R  = str2double(line(4:6));
-                type_R = regexp(strtrim(line(7:59)), '\S+', 'match');
-                while numel(type_R)<num_R
-                    line = fgetl(fpID);
-                    type_temp = regexp(strtrim(line(7:59)), '\S+', 'match');
-                    type_R = [type_R,type_temp];
-                end
-
-            case 'C'
-                num_C  = str2double(line(4:6));
-                type_C = regexp(strtrim(line(7:59)), '\S+', 'match');
-                while numel(type_C)<num_C
-                    line = fgetl(fpID);
-                    type_temp = regexp(strtrim(line(7:59)), '\S+', 'match');
-                    type_C = [type_C,type_temp];
-                end
-
-            case 'E'
-                num_E  = str2double(line(4:6));
-                type_E = regexp(strtrim(line(7:59)), '\S+', 'match');
-                while numel(type_E)<num_E
-                    line = fgetl(fpID);
-                    type_temp = regexp(strtrim(line(7:59)), '\S+', 'match');
-                    type_E = [type_E,type_temp];
-                end
-
+function h = readOBShead(path)
+%READOBSHEAD Read RINEX 2/3 observation metadata and continuation records.
+fid=fopen(path,'rt');
+if fid<0, error('SPP:FileOpen','Cannot open %s',path); end
+guard=onCleanup(@() fclose(fid));
+h=struct('ver',NaN,'version',NaN,'stationAPPR',[NaN NaN NaN], ...
+    'types',struct(),'num_lines',0,'timeSystem','GPS');
+lastSystem=''; ended=false;
+while true
+    line=fgetl(fid); if ~ischar(line), break; end
+    h.num_lines=h.num_lines+1; line=[line repmat(' ',1,max(0,80-length(line)))];
+    label=strtrim(line(61:end));
+    if contains(label,'RINEX VERSION')
+        h.version=str2double(line(1:9)); h.ver=floor(h.version);
+    elseif contains(label,'APPROX POSITION')
+        h.stationAPPR=sscanf(line(1:60),'%f',3)';
+    elseif contains(label,'TIME OF FIRST OBS')
+        h.firstObsTime=sscanf(line(1:43),'%f',6)';
+        ts=strtrim(line(49:51)); if ~isempty(ts), h.timeSystem=ts; end
+    elseif contains(label,'SYS / # / OBS TYPES')
+        if line(1)~=' '
+            lastSystem=line(1); counts.(lastSystem)=str2double(line(4:6));
+            h.types.(lastSystem)={};
         end
+        if isempty(lastSystem), error('SPP:Header','Orphan observation-type continuation'); end
+        h.types.(lastSystem)=[h.types.(lastSystem) regexp(strtrim(line(7:60)),'\S+','match')];
+    elseif contains(label,'TYPES OF OBSERV')
+        if ~isfield(h.types,'G'), h.types.G={}; counts.G=str2double(line(1:6)); end
+        h.types.G=[h.types.G regexp(strtrim(line(7:60)),'\S+','match')];
+    elseif contains(label,'END OF HEADER')
+        ended=true; break;
     end
-
-    % 7 顾及rinex2.11 版本 TYPES OF OBSERV
-    if contains(line,'TYPES OF OBSERV')
-        num_G  = str2double(line(4:6));
-        type_G = regexp(strtrim(line(7:59)), '\S+', 'match');
-       
-        num_R = num_G;
-        num_E = num_G;
-        num_C = num_G;
-        
-        type_R = type_G;
-        type_E = type_G;
-        type_C = type_G;
-
-    end
-
-
-    % 判断是否位于文件尾部
-    if contains(line,'END OF HEADER')
-        break
-    end
-
-    % 5 判断它头文件一共有多少行
-    num_lines = num_lines+1;
 end
-
-fclose(fpID);
-
-headinfo.ver = ver;
-headinfo.stationAPPR =stationAPPR;
-headinfo.firstObsTime = firstObsTime;
-headinfo.lastObsTime =lastObsTime;
-headinfo.num_lines =num_lines;
-headinfo.num_G = num_G;
-headinfo.num_R = num_R;
-headinfo.num_E = num_E;
-headinfo.num_C = num_C;
-headinfo.type_C = type_C;
-headinfo.type_G = type_G;
-headinfo.type_R = type_R;
-headinfo.type_E = type_E;
-
-
-
+if ~ended, error('SPP:Header','Missing END OF HEADER in %s',path); end
+if ~ismember(h.ver,[2 3]), error('SPP:Version','Supported observation versions: RINEX 2 and 3'); end
+systems=fieldnames(h.types);
+for k=1:numel(systems)
+    s=systems{k}; if numel(h.types.(s))~=counts.(s), error('SPP:Header','Incorrect %s observation count',s); end
+end
+if isempty(systems), error('SPP:Header','Missing observation types'); end
+if h.ver==2
+    for s='RCE', h.types.(s)=h.types.G; end
+end
+% Compatibility metadata for the original readers.
+for s='GCRE'
+    if ~isfield(h.types,s), h.types.(s)={}; end
+    h.(['type_' s])=h.types.(s); h.(['num_' s])=numel(h.types.(s));
+end
+end
