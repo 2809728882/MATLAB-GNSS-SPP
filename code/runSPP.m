@@ -13,9 +13,9 @@ mode=validatestring(config.ephemerisMode,{'broadcast','sp3'});
 obs=readObservationFile(config.obsFile,config.maxEpochs);
 if ~strcmp(obs.Header.timeSystem,'GPS'), error('SPP:TimeSystem','GPS solver requires observations in GPS time'); end
 if isempty(obs.GPS), error('SPP:NoGPS','No GPS observations'); end
-if strcmp(mode,'broadcast')
-    nav=readNavRINEX3(config.navFile); nav=nav.GPS;
-else
+% NAV also supplies satellite health and GPS L1 group delay in SP3 mode.
+nav=readNavRINEX3(config.navFile); nav=nav.GPS;
+if strcmp(mode,'sp3')
     [pos,~,id,t,clk]=readSP3(config.sp3File); sp3=struct('Position',pos,'ID',{id},'Time',t,'Clock',clk);
 end
 epochs=unique(obs.GPS.Time); n=numel(epochs); values=NaN(n,7); status=strings(n,1);
@@ -36,18 +36,20 @@ for k=1:n
             for j=1:height(current)
                 if ~isfinite(P(j)) || P(j)<=1e6 || P(j)>=1e8, continue; end
                 id=sprintf('G%02d',current.SatNO(j)); tau=P(j)/c;
-                if strcmp(mode,'broadcast')
-                    candidates=find(nav.SatelliteID==current.SatNO(j) & nav.SVHealth==0);
-                    if isempty(candidates), continue; end
-                    age=abs(seconds(epochs(k)-nav.Time(candidates))); [age,nearest]=min(age);
-                    if age>config.maxEphemerisAgeSeconds, continue; end
-                    eph=nav(candidates(nearest),:);
-                end
+                candidates=find(nav.SatelliteID==current.SatNO(j) & nav.SVHealth==0);
+                if isempty(candidates), continue; end
+                age=abs(seconds(epochs(k)-nav.Time(candidates))); [age,nearest]=min(age);
+                if age>config.maxEphemerisAgeSeconds, continue; end
+                eph=nav(candidates(nearest),:);
                 for travel=1:2
                     tx=epochs(k)-seconds(tau);
                     if strcmp(mode,'broadcast'), [sat,clock]=broadcastSatelliteState(eph,tx);
                     else
-                        try, [sat,clock]=interpolateSP3(sp3,id,tx);
+                        try
+                            [sat,clock,velocity]=interpolateSP3(sp3,id,tx);
+                            % Precise clocks need the periodic relativity term;
+                            % TGD converts the ionosphere-free clock to GPS L1.
+                            clock=clock-2*dot(sat,velocity)/c^2-eph.TGD;
                         catch err
                             if strcmp(err.identifier,'SPP:SP3Coverage'), sat=[NaN NaN NaN]; clock=NaN; break; end
                             rethrow(err);

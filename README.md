@@ -42,7 +42,7 @@ options = struct( ...
 result = runSPP(options);
 ```
 
-SP3 模式通过 `sp3File` 指定文件。观测与星历必须覆盖同一日期和历元；当前流程要求 GPS 时间，不自动换算 UTC 或其他星座时间。下载是独立的显式操作，默认流程不联网。
+SP3 模式通过 `sp3File` 指定文件，同时提供同日期 `navFile`，用于卫星健康状态和 GPS L1 TGD。精密钟差在解算前加入轨道位置和速度计算的周期相对论项及 L1 码延迟改正。观测与星历必须覆盖同一日期和历元；当前流程要求 GPS 时间，不自动换算 UTC 或其他星座时间。下载是独立的显式操作，默认流程不联网。
 
 ## 输出文件
 
@@ -98,6 +98,7 @@ docs/CHANGELOG.md               更新记录
 
 - [IGS RINEX 3.05](https://files.igs.org/pub/data/format/rinex305.pdf)
 - [IGS SP3](https://files.igs.org/pub/data/format/sp3d.pdf)
+- [ESA 相对论钟差改正](https://gssc.esa.int/navipedia/index.php/Relativistic_Clock_Correction)
 - [MATLAB 官方 GitHub Actions](https://github.com/matlab-actions)
 
 MIT 许可证。作者 XIa Bai。

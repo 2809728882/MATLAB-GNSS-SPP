@@ -79,9 +79,12 @@ function testSP3InterpolationAndCoverage(testCase)
 t=(-4:4)'*900; epoch=datetime(2025,1,1,12,0,0);
 s=struct('Time',epoch+seconds(t),'ID',{repmat({'G01'},9,1)}, ...
     'Position',[2e7+10*t+.001*t.^2 1e7+5*t 1.5e7-2*t], 'Clock',1e-4+t*1e-10);
-[pos,clock]=interpolateSP3(s,'G01',epoch+seconds(123));
+[pos,clock,velocity]=interpolateSP3(s,'G01',epoch+seconds(123));
 verifyEqual(testCase,pos,[2e7+1230+.001*123^2 1e7+615 1.5e7-246],'AbsTol',1e-6);
 verifyEqual(testCase,clock,1e-4+123e-10,'AbsTol',1e-14);
+verifyEqual(testCase,velocity,[10+.002*123 5 -2],'AbsTol',1e-8);
+[~,~,nodeVelocity]=interpolateSP3(s,'G01',epoch);
+verifyEqual(testCase,nodeVelocity,[10 5 -2],'AbsTol',1e-8);
 verifyError(testCase,@() interpolateSP3(s,'G01',epoch+seconds(4000)),'SPP:SP3Coverage');
 end
 function testBroadcastCircularOrbitAndClock(testCase)
