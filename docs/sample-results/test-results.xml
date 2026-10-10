@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<testsuites>
+  <testsuite errors="0" failures="0" name="testSPP" skipped="0" tests="14" time="4.5983">
+    <testcase classname="testSPP" name="testSyntheticPositionAndClock" time="0.25213"/>
+    <testcase classname="testSPP" name="testSingularGeometry" time="0.078489"/>
+    <testcase classname="testSPP" name="testMissingDataRequiresFourSatellites" time="0.009816"/>
+    <testcase classname="testSPP" name="testRinex3ContinuationAndEpochWithoutClock" time="0.38433"/>
+    <testcase classname="testSPP" name="testRinex2SatelliteAndTypeContinuations" time="0.12821"/>
+    <testcase classname="testSPP" name="testMalformedHeaderStopsAtEOF" time="0.014733"/>
+    <testcase classname="testSPP" name="testRinex2NavigationFixedWidth" time="0.049827"/>
+    <testcase classname="testSPP" name="testMismatchedObservationAndNavigationDates" time="0.92145"/>
+    <testcase classname="testSPP" name="testSP3UnitsRealTimesAndSameSatelliteVelocity" time="0.0537"/>
+    <testcase classname="testSPP" name="testSP3InterpolationAndCoverage" time="0.079389"/>
+    <testcase classname="testSPP" name="testBroadcastCircularOrbitAndClock" time="0.80567"/>
+    <testcase classname="testSPP" name="testBundledRinex2Sample" time="0.032616"/>
+    <testcase classname="testSPP" name="testBundledBroadcastPipeline" time="0.85019"/>
+    <testcase classname="testSPP" name="testBundledSP3Pipeline" time="0.9378"/>
+  </testsuite>
+</testsuites>
