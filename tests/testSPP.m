@@ -60,6 +60,26 @@ path=[tempname '.rnx']; cleanup=onCleanup(@() delete(path)); fid=fopen(path,'wt'
 header(fid,'     3.03           OBSERVATION DATA    G','RINEX VERSION / TYPE'); fclose(fid);
 verifyError(testCase,@() readOBShead(path),'SPP:Header');
 end
+function testRinex2NavigationFixedWidth(testCase)
+path=[tempname '.19n']; cleanup=onCleanup(@() delete(path)); fid=fopen(path,'wt');
+header(fid,'     2.11           NAVIGATION DATA    G','RINEX VERSION / TYPE'); header(fid,'','END OF HEADER');
+prefix=sprintf('%2d %02d%3d%3d%3d%3d%5.1f',1,19,3,28,0,0,0);
+assert(length(prefix)==22);
+clock=strrep(sprintf('%19.12E',[-1e-4 -1e-12 0]),'E','D'); fprintf(fid,'%s%s\n',prefix,clock);
+orbit=zeros(7,4); orbit(2,4)=5153.795; orbit(3,1)=345600; orbit(5,3)=2046;
+for k=1:7, fprintf(fid,'   %s\n',strrep(sprintf('%19.12E',orbit(k,:)),'E','D')); end
+fclose(fid); nav=readNavRINEX3(path);
+verifyEqual(testCase,height(nav.GPS),1); verifyEqual(testCase,nav.GPS.SatelliteID,1);
+verifyEqual(testCase,nav.GPS.Time,datetime(2019,3,28),'AbsTol',seconds(1e-4));
+verifyEqual(testCase,nav.GPS.SVClockBias,-1e-4,'AbsTol',1e-15);
+verifyEqual(testCase,nav.GPS.sqrtA,5153.795,'AbsTol',1e-9);
+verifyEqual(testCase,nav.GPS.GPS_Week,2046);
+end
+function testMismatchedObservationAndNavigationDates(testCase)
+options=struct('obsFile',fullfile(testCase.TestData.root,'rinex2.11','bjfs0010.25o'), ...
+    'maxEpochs',1,'outputDir','','makePlots',false);
+verifyError(testCase,@() runSPP(options),'SPP:NoSolution');
+end
 function testSP3UnitsRealTimesAndSameSatelliteVelocity(testCase)
 path=[tempname '.sp3']; cleanup=onCleanup(@() delete(path)); fid=fopen(path,'wt');
 for t=[0 30 90]
